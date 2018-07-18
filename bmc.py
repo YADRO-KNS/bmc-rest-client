@@ -120,11 +120,11 @@ def do_put(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--server', help='hostname or IP of BMC',
+    parser.add_argument('-s', '--server', help='hostname or IP of BMC',
                         type=str)
-    parser.add_argument('--username', help='username to log in on the BMC',
+    parser.add_argument('-u', '--username', help='username to log in on the BMC',
                         type=str)
-    parser.add_argument('--password', help='password to log in on the BMC',
+    parser.add_argument('-p', '--password', help='password to log in on the BMC',
                         type=str)
 
     subparsers = parser.add_subparsers()
