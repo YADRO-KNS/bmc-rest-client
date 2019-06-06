@@ -34,7 +34,7 @@ class App:
     def __init__(self, host, username, password):
         print("--- initialize ---")
         self.start_time = time.time()
-        self.url = "https://{0}/".format(host)
+        self.url = "https://{0}".format(host)
         self.session = requests.Session()
         self.login(username, password)
         self.subscribe(host)
@@ -56,8 +56,9 @@ class App:
         sys.stdout.flush()
 
     def strip_value(self, value):
-        n = value.rfind('.') + 1
-        return value[n:]
+        s = str(value)
+        n = s.rfind('.') + 1
+        return s[n:]
 
     def show_attr(self, path, attr):
         try:
@@ -67,14 +68,20 @@ class App:
             pass
 
     def login(self, username, password):
-        r = self.session.post(self.url + 'login',
+        r = self.session.post(self.url + '/login',
                 json={'data': [username, password], 'force': True},
                 verify=False)
         j = r.json()
         if j['status'] != 'ok':
             raise Exception('Failed to login: %r\n' % r.text)
 
+        if 'SESSION' in self.session.cookies.keys():
+            self.session.headers.update({
+                'X-Auth-Token': self.session.cookies['SESSION']
+                })
+
         self.trace_message('Login succeeded!')
+
         self.show_attr('/xyz/openbmc_project/state/bmc0', 'CurrentBMCState')
         self.show_attr('/xyz/openbmc_project/state/chassis0', 'CurrentPowerState')
         self.show_attr('/xyz/openbmc_project/state/host0', 'CurrentHostState')
@@ -87,7 +94,9 @@ class App:
                                 sslopt={
                                     "cert_reqs": ssl.CERT_NONE, 
                                     "check_hostname": False},
-                                cookie = ("sid=%s" % self.session.cookies.get("sid")))
+                                cookie = "; ".join([
+                                    ("%s=%s" % (k,v)) 
+                                    for k,v in self.session.cookies.items()]))
     def _recv(self):
         try:
             frame = self.ws.recv_frame()

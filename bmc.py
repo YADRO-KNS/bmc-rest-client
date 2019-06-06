@@ -16,17 +16,22 @@ import os
 
 class BMC:
     def __init__(self, server, username, password):
-        self.url = "https://{0}/".format(server)
+        self.url = "https://{0}".format(server)
         self.session = requests.Session()
         self.login(username, password)
 
     def login(self, username, password):
-        r = self.session.post(self.url + 'login',
+        r = self.session.post(self.url + '/login',
                               json={'data': [username, password]},
                               verify=False)
         j = r.json()
         if j['status'] != 'ok':
             raise Exception("Failed to login: \n" + r.text)
+
+        if 'SESSION' in self.session.cookies.keys():
+            self.session.headers.update({
+                'X-Auth-Token': self.session.cookies['SESSION']
+                })
 
     def list(self, path):
         r = self.session.get(self.url + path + '/list',
