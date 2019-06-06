@@ -138,7 +138,7 @@ class App:
 
             try:
                 j = json.loads(data)
-                if j.has_key('properties'):
+                if 'properties' in j:
                     for p in j['properties']:
                         self.trace_message("%s: %s" % (p, self.strip_value(j['properties'][p])))
 

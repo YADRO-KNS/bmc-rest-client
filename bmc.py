@@ -28,7 +28,7 @@ class BMC:
         if j['status'] != 'ok':
             raise Exception("Failed to login: \n" + r.text)
 
-        if 'SESSION' in self.session.cookies.keys():
+        if 'SESSION' in self.session.cookies:
             self.session.headers.update({
                 'X-Auth-Token': self.session.cookies['SESSION']
                 })
@@ -112,11 +112,11 @@ def do_list(args):
 
 def do_enum(args):
     s = BMC(server=args.server, username=args.username, password=args.password)
-    print json.dumps(s.enum(args.path), indent=4)
+    print (json.dumps(s.enum(args.path), indent=4))
 
 def do_get(args):
     s = BMC(server=args.server, username=args.username, password=args.password)
-    print json.dumps(s.get(args.path), indent=4)
+    print (json.dumps(s.get(args.path), indent=4))
 
 def do_put(args):
     s = BMC(server=args.server, username=args.username, password=args.password)
