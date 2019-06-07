@@ -1,9 +1,25 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#
+# Copyright (c) 2018 YADRO
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+""" Helper to send REST requests to the BMC. """
 
 import argparse
-import requests
 import json
+import os
+import requests
 
 try:
     import configparser
@@ -11,22 +27,23 @@ except ImportError:
     import ConfigParser as configparser
 
 from xdg.BaseDirectory import xdg_config_home
-import os
 
 
 class BMC:
+    """ BMC seesion """
     def __init__(self, server, username, password):
         self.url = "https://{0}".format(server)
         self.session = requests.Session()
         self.login(username, password)
 
     def login(self, username, password):
-        r = self.session.post(self.url + '/login',
-                              json={'data': [username, password]},
-                              verify=False)
-        j = r.json()
-        if j['status'] != 'ok':
-            raise Exception("Failed to login: \n" + r.text)
+        """ Send a login request. """
+        req = self.session.post(self.url + '/login',
+                                json={'data': [username, password]},
+                                verify=False)
+        jdata = req.json()
+        if jdata['status'] != 'ok':
+            raise Exception("Failed to login: \n" + req.text)
 
         if 'SESSION' in self.session.cookies:
             self.session.headers.update({
@@ -34,52 +51,58 @@ class BMC:
                 })
 
     def list(self, path):
-        r = self.session.get(self.url + path + '/list',
-                             verify=False)
-        j = r.json()
-        if j['status'] != 'ok':
-            raise Exception("Failed to query list: \n" + r.text)
+        """ Send a list request. """
+        req = self.session.get(self.url + path + '/list',
+                               verify=False)
+        jdata = req.json()
+        if jdata['status'] != 'ok':
+            raise Exception("Failed to query list: \n" + req.text)
 
-        l = j['data']
-        return l
+        return jdata['data']
 
     def enum(self, path):
-        r = self.session.get(self.url + path + '/enumerate',
-                             verify=False)
-        j = r.json()
-        if j['status'] != 'ok':
-            raise Exception("Failed to query enumerate: \n" + r.text)
+        """ Send a enumerate request. """
+        req = self.session.get(self.url + path + '/enumerate',
+                               verify=False)
+        jdata = req.json()
+        if jdata['status'] != 'ok':
+            raise Exception("Failed to query enumerate: \n" + req.text)
 
-        return j['data']
+        return jdata['data']
 
     def get(self, path):
-        r = self.session.get(self.url + path, verify=False)
+        """ Send a simple get request. """
+        req = self.session.get(self.url + path, verify=False)
 
-        j = r.json()
-        if j['status'] != 'ok':
-            raise Exception("Failed to query get: \n" + r.text)
+        jdata = req.json()
+        if jdata['status'] != 'ok':
+            raise Exception("Failed to query get: \n" + req.text)
 
-        return j['data']
+        return jdata['data']
 
     def put(self, path, value):
-        r = self.session.put(self.url + path,
-                             json={'data': value},
-                             verify=False)
-        j = r.json()
-        if j['status'] != 'ok':
-            raise Exception("Failed to qeury put: \n" + r.text)
+        """ Send a put request. """
+        req = self.session.put(self.url + path,
+                               json={'data': value},
+                               verify=False)
+        jdata = req.json()
+        if jdata['status'] != 'ok':
+            raise Exception("Failed to qeury put: \n" + req.text)
 
         return True
 
 def _get_cfg_value(cfg, server, option):
+    """ Get actual value of option from config. """
+    value = None
     if cfg.has_option(server, option):
-        return cfg.get(server, option)
+        value = cfg.get(server, option)
     elif cfg.has_option("global", option):
-        return cfg.get("global", option)
+        value = cfg.get("global", option)
 
-    return None
+    return value
 
 def read_config(args):
+    """ Read config file. """
     path = os.path.join(xdg_config_home, 'bmc', 'settings')
     if os.path.exists(path):
         cfg = configparser.ConfigParser()
@@ -106,58 +129,61 @@ def read_config(args):
     return args.server and args.username and args.password
 
 def do_list(args):
-    s = BMC(server=args.server, username=args.username, password=args.password)
-    for i in s.list(args.path):
-        print (i)
+    """ Send list request and show answer. """
+    session = BMC(server=args.server, username=args.username, password=args.password)
+    for i in session.list(args.path):
+        print(i)
 
 def do_enum(args):
-    s = BMC(server=args.server, username=args.username, password=args.password)
-    print (json.dumps(s.enum(args.path), indent=4))
+    """ Send enumerate request and show answer. """
+    session = BMC(server=args.server, username=args.username, password=args.password)
+    print(json.dumps(session.enum(args.path), indent=4))
 
 def do_get(args):
-    s = BMC(server=args.server, username=args.username, password=args.password)
-    print (json.dumps(s.get(args.path), indent=4))
+    """ Send get request for specified attribute. """
+    session = BMC(server=args.server, username=args.username, password=args.password)
+    print(json.dumps(session.get(args.path), indent=4))
 
 def do_put(args):
-    s = BMC(server=args.server, username=args.username, password=args.password)
-    if s.put("{0}/attr/{1}".format(args.path, args.attr), args.value):
+    """ Send put request to change value of specified attribute. """
+    session = BMC(server=args.server, username=args.username, password=args.password)
+    if session.put("{0}/attr/{1}".format(args.path, args.attr), args.value):
         do_get(args)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--server', help='hostname or IP of BMC',
+    PARSER = argparse.ArgumentParser()
+    PARSER.add_argument('-s', '--server', help='hostname or IP of BMC',
                         type=str)
-    parser.add_argument('-u', '--username', help='username to log in on the BMC',
+    PARSER.add_argument('-u', '--username', help='username to log in on the BMC',
                         type=str)
-    parser.add_argument('-p', '--password', help='password to log in on the BMC',
+    PARSER.add_argument('-p', '--password', help='password to log in on the BMC',
                         type=str)
 
-    subparsers = parser.add_subparsers()
+    SUBPARSERS = PARSER.add_subparsers()
 
-    list_items = subparsers.add_parser('list', help='List items on BMC')
-    list_items.add_argument('path', help='Items path', type=str, nargs='?', default='/')
-    list_items.set_defaults(func=do_list)
+    LIST_ITEMS = SUBPARSERS.add_parser('list', help='List items on BMC')
+    LIST_ITEMS.add_argument('path', help='Items path', type=str, nargs='?', default='/')
+    LIST_ITEMS.set_defaults(func=do_list)
 
-    enum_items = subparsers.add_parser('enum', help='Enumerate items on BMC')
-    enum_items.add_argument('path', help='Items path', type=str, nargs='?', default='/')
-    enum_items.set_defaults(func=do_enum)
+    ENUM_ITEMS = SUBPARSERS.add_parser('enum', help='Enumerate items on BMC')
+    ENUM_ITEMS.add_argument('path', help='Items path', type=str, nargs='?', default='/')
+    ENUM_ITEMS.set_defaults(func=do_enum)
 
-    get_items = subparsers.add_parser('get', help='Get specified item from BMC')
-    get_items.add_argument('path', help='Items path', type=str)
-    get_items.set_defaults(func=do_get)
+    GET_ITEMS = SUBPARSERS.add_parser('get', help='Get specified item from BMC')
+    GET_ITEMS.add_argument('path', help='Items path', type=str)
+    GET_ITEMS.set_defaults(func=do_get)
 
-    put_items = subparsers.add_parser('put', help='Put specified value into specified item on BMC')
-    put_items.add_argument('path', help='Items path', type=str)
-    put_items.add_argument('attr', help='Items attribute name', type=str)
-    put_items.add_argument('value', help='Items attribute value', type=str)
-    put_items.set_defaults(func=do_put)
+    PUT_ITEMS = SUBPARSERS.add_parser('put', help='Put specified value into specified item on BMC')
+    PUT_ITEMS.add_argument('path', help='Items path', type=str)
+    PUT_ITEMS.add_argument('attr', help='Items attribute name', type=str)
+    PUT_ITEMS.add_argument('value', help='Items attribute value', type=str)
+    PUT_ITEMS.set_defaults(func=do_put)
 
-    from requests.packages.urllib3.exceptions import InsecureRequestWarning
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    from urllib3 import disable_warnings, exceptions
+    disable_warnings(exceptions.InsecureRequestWarning)
 
-    args = parser.parse_args()
-    if read_config(args) and 'func' in args:
-        args.func(args)
+    ARGS = PARSER.parse_args()
+    if read_config(ARGS) and 'func' in ARGS:
+        ARGS.func(ARGS)
     else:
-        parser.print_help()
-
+        PARSER.print_help()
